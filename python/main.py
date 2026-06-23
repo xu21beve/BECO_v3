@@ -14,6 +14,7 @@
 
 from dataclasses import dataclass
 from beco_v3 import Motor, Module, Robot
+import time
 
 # --- LSS motor IDs ----------------------------------------------------------
 
@@ -39,27 +40,27 @@ class ModuleConfig:
 
 module1 = ModuleConfig(
     period                  = 10000,   # originally 3000
-    body_amp                = 600,    # servo scale (not degrees); default ~700
-    phi_FB                  = 0.9,    # value in [0, 1)
+    body_amp                = 600,    # servo scale (not degrees); default ~700; previously 600 (set to 0 for testing legs without body)
+    phi_FB                  = 0.7,    # value in [0, 1)
     phi_FR                  = 0.3,    # value in [0, 1)
     frontleg_standard_phase = 0,
     servo_deg_scale         = 10,
-    leg_amp                 = 900,    # servo scale; 900 ≈ fully extended
+    leg_amp                 = 1600,    # servo scale; 900 ≈ fully extended
     # angle_offset_leg        = -900,   # = -leg_amp
-    angle_offset_leg        = 0.25,
+    angle_offset_leg        = 0,     # TODO: add independent leg angle offsets
     angle_offset_body       = 0,
 )
 
 # --- Build motors -----------------------------------------------------------
 
 front_leg = Motor(LSS_ID_LEG_1, module1.leg_amp, module1.period,
-                  module1.frontleg_standard_phase, module1.angle_offset_leg)
+                  module1.angle_offset_leg, module1.frontleg_standard_phase)
 
 back_leg  = Motor(LSS_ID_LEG_2, module1.leg_amp, module1.period,
-                  module1.phi_FR, module1.angle_offset_leg)
+                  module1.angle_offset_leg, module1.phi_FR)
 
 body      = Motor(LSS_ID_BODY_1, module1.body_amp, module1.period,
-                  module1.phi_FB, module1.angle_offset_body)
+                  module1.angle_offset_body, module1.phi_FB)
 
 # --- Build module and robot -------------------------------------------------
 

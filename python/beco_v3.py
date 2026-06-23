@@ -60,10 +60,10 @@ class Motor:
         return out
 
     def move(self, angle_pos: float):
-        self.motor_obj.move(angle_pos)
+        self.motor_obj.move(int(round(angle_pos)))
 
     def print_current(self):
-        print(f"Motor with ID {self.ID} current draw (amps): {self.motor_obj.getCurrent()}")
+        print(f"Motor with ID {self.ID} current draw (mA): {self.motor_obj.getCurrent()}")
 
     def get_current(self) -> float:
         return self.motor_obj.getCurrent()
@@ -105,6 +105,7 @@ class Module:
             self.front_leg.move(self.front_leg.triangle_wave(time_ms))
             print(f"front leg target pose: {self.front_leg.triangle_wave(time_ms)}")
         self.back_leg.move(self.back_leg.triangle_wave(time_ms))
+        print(f"back leg target pose: {self.back_leg.triangle_wave(time_ms)}")
         self.body.move(self.body.triangle_wave(time_ms))
 
     def get_motor_currents(self) -> list[float]:
@@ -161,7 +162,15 @@ class Robot:
         for mod in self.modules:
             mod.move_module(self._millis())
 
-        time.sleep(15)                 # delay(15000) — initial settle
+        # Wait 5 seconds with a single-line spinner
+        total_secs = 5
+        spinner = ["|", "/", "-", "\\"]
+        for sec in range(1, total_secs + 1):
+            spin = spinner[(sec - 1) % len(spinner)]
+            print(f"Setup settling: {sec}/{total_secs} {spin}", end="\r", flush=True)
+            time.sleep(1)
+        # Clear the spinner line and print completion message
+        print(" " * 40, end="\r")
         print("Done setting up.")
         self.has_setup  = True
         self.start_time = self._millis()
@@ -176,7 +185,7 @@ class Robot:
         for mod in self.modules:
             mod.move_module(elapsed)
 
-        time.sleep(0.1)                # pause sending commands for 20 ms
+        time.sleep(0.02)                # pause sending commands for 20 ms
 
     def print_motor_currents(self):
         for mod in self.modules:
