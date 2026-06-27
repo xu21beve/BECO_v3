@@ -28,8 +28,7 @@ import lib.lss.lss as lss
 import lib.lss.lss_const as lssc            # required by lss.py internally; imported for completeness
 
 LSS_BAUD   = 115200                 # matches LSS_DefaultBaud convention
-LSS_SERIAL = "COM10"        # replace with the actual serial port name
-
+LSS_SERIAL = "COM12"        # replace with the actual serial port name
 
 # ---------------------------------------------------------------------------
 # Motor
@@ -66,7 +65,7 @@ class Motor:
         print(f"Motor with ID {self.ID} current draw (mA): {self.motor_obj.getCurrent()}")
 
     def get_current(self) -> float:
-        return self.motor_obj.getCurrent()
+        return float(self.motor_obj.getCurrent())
 
 
 # ---------------------------------------------------------------------------
@@ -103,9 +102,9 @@ class Module:
         # (their front leg position is driven by the parent's back leg timing)
         if self.parent_module is None:
             self.front_leg.move(self.front_leg.triangle_wave(time_ms))
-            print(f"front leg target pose: {self.front_leg.triangle_wave(time_ms)}")
+            # print(f"front leg target pose: {self.front_leg.triangle_wave(time_ms)}")
         self.back_leg.move(self.back_leg.triangle_wave(time_ms))
-        print(f"back leg target pose: {self.back_leg.triangle_wave(time_ms)}")
+        # print(f"back leg target pose: {self.back_leg.triangle_wave(time_ms)}")
         self.body.move(self.body.triangle_wave(time_ms))
 
     def get_motor_currents(self) -> list[float]:
@@ -147,11 +146,12 @@ class Module:
 # Robot
 # ---------------------------------------------------------------------------
 
-class Robot:
+class Robot:    
     def __init__(self, modules: list[Module]):
         self.modules    = modules
         self.has_setup  = False
         self.start_time = 0.0          # will be set in setup(), stored as ms
+        self.stall_time = 0.0
 
     def setup(self):
         # Initialise the LSS bus (replaces LSS::initBus + Serial.begin)
@@ -160,7 +160,7 @@ class Robot:
         print("LSS bus initialised.")
 
         for mod in self.modules:
-            mod.move_module(self._millis())
+            mod.move_module(0)  # Move everything to the starting position
 
         # Wait 5 seconds with a single-line spinner
         total_secs = 5
@@ -175,10 +175,10 @@ class Robot:
         self.has_setup  = True
         self.start_time = self._millis()
 
-    def loop(self):
+    def loop(self, stall_current):
         if not self.has_setup:
             print("Need to run setup first before looping. Exiting loop.")
-            return
+            raise RuntimeError("Need to setup.")
 
         elapsed = self._millis() - self.start_time
 
@@ -187,12 +187,40 @@ class Robot:
 
         time.sleep(0.02)                # pause sending commands for 20 ms
 
+        # monitor motor current draw and break loop if exceeding stall current for 0.1 seconds
+        robot_currents = self.get_motor_currents() # get currents for all robot motors
+
+        if self.check_stall_current(robot_currents, stall_current): # update stall time if currently stalling
+            self.stall_time += 0.02
+        else:
+            self.stall_time = 0.0
+        
+        if self.stall_time >= 0.10: # break loop if stall time has exceeded 0.10 seconds
+            print(f"Motor reached stall current of {stall_current} mA. Exiting loop.")
+            self.go_limp()
+            raise RuntimeError("Stalling. Going limp.")
+        
+        return True
+        
+
+    def check_stall_current(self, robot_currents, stall_current):
+        for mod_currents in robot_currents:
+            for motor_current in mod_currents:
+                if motor_current >= stall_current:
+                    return True
+
     def print_motor_currents(self):
         for mod in self.modules:
             mod.print_motor_currents()
 
     def get_motor_currents(self) -> list[list[float]]:
         return [mod.get_motor_currents() for mod in self.modules]
+    
+    def go_limp(self):
+        for mod in self.modules:
+            mod.front_leg.motor_obj.limp()
+            mod.body.motor_obj.limp()
+            mod.back_leg.motor_obj.limp()
 
     # ------------------------------------------------------------------
     # Internal helpers

@@ -22,6 +22,9 @@ LSS_ID_LEG_1  = 0
 LSS_ID_LEG_2  = 2
 LSS_ID_BODY_1 = 1
 
+# --- Constants --------------------------------------------------------------
+MOTOR_BREAKER_CURRENT = 600 # mA
+
 # --- ModuleConfig dataclass (replaces C++ struct) ---------------------------
 
 @dataclass
@@ -39,15 +42,15 @@ class ModuleConfig:
 # --- Module 1 configuration -------------------------------------------------
 
 module1 = ModuleConfig(
-    period                  = 10000,   # originally 3000
-    body_amp                = 600,    # servo scale (not degrees); default ~700; previously 600 (set to 0 for testing legs without body)
-    phi_FB                  = 0.7,    # value in [0, 1)
-    phi_FR                  = 0.3,    # value in [0, 1)
+    period                  = 5000,   # originally 3000
+    body_amp                = 700,    # servo scale (not degrees); default ~700; previously 600 (set to 0 for testing legs without body)
+    phi_FB                  = 0.3,    # value in [0, 1)
+    phi_FR                  = 0.5,    # value in [0, 1)
     frontleg_standard_phase = 0,
     servo_deg_scale         = 10,
     leg_amp                 = 1600,    # servo scale; 900 ≈ fully extended
     # angle_offset_leg        = -900,   # = -leg_amp
-    angle_offset_leg        = 0,     # TODO: add independent leg angle offsets
+    angle_offset_leg        = 0,
     angle_offset_body       = 0,
 )
 
@@ -77,7 +80,7 @@ if __name__ == "__main__":
     robot.setup()
 
     while True:
-        robot.loop()
-        # robot.print_motor_currents()
+        robot.loop(MOTOR_BREAKER_CURRENT)
+        robot.print_motor_currents()
         # To retrieve an n×3 matrix of currents instead:
         #   currents = robot.get_motor_currents()
