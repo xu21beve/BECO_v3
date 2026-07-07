@@ -65,7 +65,8 @@ class Motor:
         print(f"Motor with ID {self.ID} current draw (mA): {self.motor_obj.getCurrent()}")
 
     def get_current(self) -> float:
-        return float(self.motor_obj.getCurrent())
+        value = self.motor_obj.getCurrent()
+        return float(value) if value is not None else float("nan")
 
 
 # ---------------------------------------------------------------------------

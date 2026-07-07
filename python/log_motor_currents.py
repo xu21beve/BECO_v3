@@ -17,8 +17,8 @@ from dataclasses import dataclass
 
 # --- LSS motor IDs ----------------------------------------------------------
 
-LSS_ID_LEG_1  = 0
-LSS_ID_LEG_2  = 2
+LSS_ID_LEG_1  = 2
+LSS_ID_LEG_2  = 0
 LSS_ID_BODY_1 = 1
 
 # --- Constants --------------------------------------------------------------
@@ -41,14 +41,14 @@ class ModuleConfig:
 # --- Module 1 configuration -------------------------------------------------
 
 module1 = ModuleConfig(
-    period                  = 5000,
-    body_amp                = 800,
-    phi_FB                  = 0.3,
-    phi_FR                  = 0.32,
+    period                  = 3000,
+    body_amp                = 600,
+    phi_FB                  = 0.7,
+    phi_FR                  = 0.5,
     frontleg_standard_phase = 0,
     servo_deg_scale         = 10,
-    leg_amp                 = 1700,
-    angle_offset_leg        = 0,
+    leg_amp                 = 1300, # previously 1700
+    angle_offset_leg        = 400,
     angle_offset_body       = 0,
 )
 
@@ -149,23 +149,23 @@ if __name__ == "__main__":
                 motor_types = ['front_leg', 'back_leg', 'body']
                 motors = [mod.front_leg, mod.back_leg, mod.body]
                 
-                with open(csv_filename, 'a', newline='') as csvfile:
-                    fieldnames = ['timestamp_ms', 'module_id', 'motor_type', 'motor_id', 'current_ma']
-                    writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
+                # with open(csv_filename, 'a', newline='') as csvfile:
+                #     fieldnames = ['timestamp_ms', 'module_id', 'motor_type', 'motor_id', 'current_ma']
+                #     writer = csv.DictWriter(csvfile, fieldnames=fieldnames)
                     
-                    # Write header if file is new
-                    if os.path.getsize(csv_filename) == 0:
-                        writer.writeheader()
+                #     # Write header if file is new
+                #     if os.path.getsize(csv_filename) == 0:
+                #         writer.writeheader()
                     
-                    for motor_type, motor in zip(motor_types, motors):
-                        current_ma = motor.get_current()
-                        writer.writerow({
-                            'timestamp_ms': f"{timestamp_ms:.2f}",
-                            'module_id': module_id,
-                            'motor_type': motor_type,
-                            'motor_id': motor.ID,
-                            'current_ma': f"{current_ma:.2f}"
-                        })
+                #     for motor_type, motor in zip(motor_types, motors):
+                #         current_ma = motor.get_current()
+                #         writer.writerow({
+                #             'timestamp_ms': f"{timestamp_ms:.2f}",
+                #             'module_id': module_id,
+                #             'motor_type': motor_type,
+                #             'motor_id': motor.ID,
+                #             'current_ma': f"{current_ma:.2f}"
+                #         })
             
             # Optional: print status periodically
             if int(timestamp_ms) % 5000 == 0:
