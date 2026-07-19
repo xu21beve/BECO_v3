@@ -28,7 +28,7 @@ import lib.lss.lss as lss
 import lib.lss.lss_const as lssc            # required by lss.py internally; imported for completeness
 
 LSS_BAUD   = 115200                 # matches LSS_DefaultBaud convention
-LSS_SERIAL = "COM12"        # replace with the actual serial port name
+LSS_SERIAL = "COM10"        # replace with the actual serial port name
 
 # ---------------------------------------------------------------------------
 # Motor
@@ -164,7 +164,7 @@ class Robot:
             mod.move_module(0)  # Move everything to the starting position
 
         # Wait 5 seconds with a single-line spinner
-        total_secs = 5
+        total_secs = 10
         spinner = ["|", "/", "-", "\\"]
         for sec in range(1, total_secs + 1):
             spin = spinner[(sec - 1) % len(spinner)]
