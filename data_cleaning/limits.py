@@ -150,6 +150,7 @@ def plot_mod_path(df: pd.DataFrame):
 # by the starting values of the individual markers on pvc1 and pvc4 -- define start as when pvc1 and pvc4
 # have non-empty position values. Define the largest possible rectangle. 
 # Print a note that there is no perimeter checking occuring if wire_diam = static and then pass
+# FIXME: Ignore pvc1 for 0.5, 20 mm, 0.61 phi_fb case
 def sense_robot_perimeter(df: pd.DataFrame, start_t: float, stop_t: float):
     # Print a note if wire_diam is static (no perimeter checking)
     if isinstance(wire_diam, str) and wire_diam.lower() == "static":
