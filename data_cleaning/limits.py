@@ -4,9 +4,9 @@ import numpy as np
 from datetime import datetime
 
 # this is where we specify what trial we want to analyze
-wire_diam = 0.8
-pvc_spacing = 20
-phi_fb = 0.89
+wire_diam = 0.5
+pvc_spacing = 30
+phi_fb = 0.7
 
 file_dir = f'processed_data/{wire_diam}mm_Wire_Spring/'
 file_name = f'{pvc_spacing}mm_{phi_fb}.csv'
