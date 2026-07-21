@@ -17,44 +17,40 @@ back_marker2_is_top_cases = [
 ]
 
 top_marker_dist_lims = [105e-3, 150e-3] # m
-mod_vectors_1_0 = {"front": [[1e-2*(5.5-1.675), 1e-2*(-3.5-0.75-0.65), 1e-2*(0.7+0.4+1.4)], 
-                                  [1e-2*(-5.5+1.9), 1e-2*(-3.5-0.75-0.75), 1e-2*(0.7+0.4+0.95)]],
-                    "back": [[1e-2*(-5.5+1.2), 1e-2*(-3.65-0.75-1.85), 1e-2*(-0.9-0.4-3.675)],
-                                  [1e-2*(5.5-5.3), 1e-2*(-3.65-0.75-0.5), 1e-2*(-0.9-0.4-3.77)]]} # sorted left-right, x, y, z
-mod_vectors_static = {"front": [[1e-2*(-1)*(-5.65/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(-1)*(0.9+2.6)], # z= 0.35+0.7
-                                  [1e-2*(-5.65/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(-1)*(0.9+2.6)]],
-                    "back": [[1e-2*(-3.9/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(0.9+2.6)],
-                                  [1e-2*(-1)*(-3.9/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(0.9+2.6)]]}
+mod_vectors_1_0 = {  # sorted left-right, x, y, z
+    "front": [[1e-2*(5.5-1.675), 1e-2*(-3.5-0.75-0.65), 1e-2*(1.0+0.4+1.4)], 
+              [1e-2*(-5.5+1.9), 1e-2*(-3.5-0.75-0.75), 1e-2*(1.0+0.4+0.95)]],
+    "back":  [[1e-2*(-5.5+1.2), 1e-2*(-3.65-0.75-1.85), 1e-2*(-1.0-0.4-3.675)],
+              [1e-2*(5.5-5.3), 1e-2*(-3.65-0.75-0.5), 1e-2*(-1.0-0.4-3.77)]]}
+mod_vectors_static = {
+    "front": [[1e-2*(-1)*(-5.65/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(-1)*(1.0+2.6)],
+              [1e-2*(-5.65/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(-1)*(1.0+2.6)]],
+    "back":  [[1e-2*(-3.9/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(1.0+2.6)],
+              [1e-2*(-1)*(-3.9/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(1.0+2.6)]]}
+top_marker_lengths = { # sorted as [front, back]
+    "0.5": [3.5 + (2.54*1.5), 3.65 + (2.54*1.5)],
+    "0.8": [3.5 + (2.54*1.5), 3.65 + (2.54*1.5)],
+    "1.0": [3.5 + (2.54*1.5), 3.65 + (2.54*1.5)],
+    "static": [1.05 + (2.54*1.5), 1.05 + (2.54*1.5)]
+}
+top_marker_z_distance = { # sorted as [front, back]
+    "0.5": [(38.1-1.0)+2.6, 25.4+2.6+(38.1-1.0)],
+    "0.8": [(38.1-1.0)+2.6, 25.4+2.6+(38.1-1.0)],
+    "1.0": [(38.1-1.0)+2.6, 25.4+2.6+(38.1-1.0)],
+    "static": [1.0+2.6, 25.4+2.6+1.0]
+}
 
-# Get raw module angles (relative to defined ground plane). Using normal vector of rigid body, relative to each origin axis.
-def get_marker_body_angle(df: pd.DataFrame, module_name: str):
-    # Use all three module markers as points to define the plane, find the x, y, and z angles
-    # relative to the ground plane, as defined by the normal vector <x, y, z> = <0, 1, 0>
-    # and the origin (x, y, z) = (0, 0, 0)
-
-    # Ground plane normal
-    ground_normal = np.array([0.0, 1.0, 0.0])
-
-    # Extract the three marker positions as (x, y, z) tuples
-    markers = [f"{module_name}:Marker1", f"{module_name}:Marker2", f"{module_name}:Marker3"]
-    points = []
-    for marker in markers:
-        try:
-            x = df[(marker, "Position", "X")]
-            y = df[(marker, "Position", "Y")]
-            z = df[(marker, "Position", "Z")]
-            points.append(np.column_stack((x, y, z)))
-        except KeyError:
-            raise KeyError(f"Marker column '{marker}' not found in DataFrame.")
-
-    # Stack into a single array of shape (n_samples, 3, 3)
-    p1, p2, p3 = points  # each is (n_samples, 3)
-
-    # Compute two edge vectors for each time step: v1 = p2-p1, v2 = p3-p1
-    v1 = p2 - p1
-    v2 = p3 - p1
-
-    return get_measured_angle_offsets(v1, v2)
+# Reconstruct unit normal vectors from angles (direction cosines)
+# Each angle tuple: (x_angle, y_angle, z_angle) in degrees
+def _angles_to_normals(angle_tuple):
+    x_deg, y_deg, z_deg = angle_tuple
+    x_rad = np.radians(x_deg)
+    y_rad = np.radians(y_deg)
+    z_rad = np.radians(z_deg)
+    nx = np.cos(x_rad)
+    ny = np.cos(y_rad)
+    nz = np.cos(z_rad)
+    return np.column_stack((nx, ny, nz))  # shape (n_samples, 3)
 
 # Plot module angles
 def plot_angles(df: pd.DataFrame, x_angle, y_angle, z_angle):
@@ -151,6 +147,36 @@ def get_robot_flat_times(df: pd.DataFrame, dist):
             flat_times.append(df.index[i])
     
     return flat_times
+
+# Get raw module angles (relative to defined ground plane). Using normal vector of rigid body, relative to each origin axis.
+def get_marker_body_angle(df: pd.DataFrame, module_name: str):
+    # Use all three module markers as points to define the plane, find the x, y, and z angles
+    # relative to the ground plane, as defined by the normal vector <x, y, z> = <0, 1, 0>
+    # and the origin (x, y, z) = (0, 0, 0)
+
+    # Ground plane normal
+    ground_normal = np.array([0.0, 1.0, 0.0])
+
+    # Extract the three marker positions as (x, y, z) tuples
+    markers = [f"{module_name}:Marker1", f"{module_name}:Marker2", f"{module_name}:Marker3"]
+    points = []
+    for marker in markers:
+        try:
+            x = df[(marker, "Position", "X")]
+            y = df[(marker, "Position", "Y")]
+            z = df[(marker, "Position", "Z")]
+            points.append(np.column_stack((x, y, z)))
+        except KeyError:
+            raise KeyError(f"Marker column '{marker}' not found in DataFrame.")
+
+    # Stack into a single array of shape (n_samples, 3, 3)
+    p1, p2, p3 = points  # each is (n_samples, 3)
+
+    # Compute two edge vectors for each time step: v1 = p2-p1, v2 = p3-p1
+    v1 = p2 - p1
+    v2 = p3 - p1
+
+    return get_measured_angle_offsets(v1, v2)
 
 # Get measured plane angle offset from ground plane (only for static and 1.0 tests), defined by top marker point and normal vector
 # basically get measured angle offset from horizontal, which we can readily subtract from raw plane offsets from horizontal
@@ -292,7 +318,54 @@ def get_module_angles(df: pd.DataFrame, angle_offsets):
 
     return (front_x, front_y, front_z), (back_x, back_y, back_z)
 
-# Get 
+# Get top marker bottom point
+def get_top_marker_bottom_points(df: pd.DataFrame, module_angles):
+    # From the top marker points, subtract the vector along each plane's normal vector, which has a positive y value, and scale it such that its length is equal to the length of
+    # Use top_marker_lengths
+
+    front_angles, back_angles = module_angles  # each (nx, ny, nz)
+    top_marker_1, top_marker_2 = get_top_marker_names(df)
+
+    # Get the module names
+    front_mod_name = top_marker_1.split(":")[0]
+    back_mod_name = top_marker_2.split(":")[0]
+
+    # Look up top marker lengths for this wire diameter
+    wire_key = str(limits.wire_diam)
+    if wire_key not in top_marker_lengths:
+        print(f"Warning: wire_diam '{wire_key}' not in top_marker_lengths; skipping bottom point computation.")
+        return None, None
+    front_length, back_length = top_marker_lengths[wire_key]
+
+    def _get_top_marker_pos(marker_name):
+        subscript = ".1" if not (marker_name, "Position", "X") in df.columns else ""
+        x = df[(marker_name, "Position", "X" + subscript)].to_numpy()
+        y = df[(marker_name, "Position", "Y" + subscript)].to_numpy()
+        z = df[(marker_name, "Position", "Z" + subscript)].to_numpy()
+        return np.column_stack((x, y, z))  # shape (n_samples, 3)
+
+    p_top_front = _get_top_marker_pos(top_marker_1)
+    p_top_back  = _get_top_marker_pos(top_marker_2)
+
+    front_normals = _angles_to_normals(front_angles)
+    back_normals  = _angles_to_normals(back_angles)
+
+    # Ensure normals point upward (positive y component)
+    front_normals[front_normals[:, 1] < 0] *= -1
+    back_normals[back_normals[:, 1] < 0]   *= -1
+
+    # Bottom points = top point - length * unit_normal
+    front_bottom = p_top_front - front_length * front_normals
+    back_bottom  = p_top_back  - back_length  * back_normals
+
+    return front_bottom, back_bottom
+
+# Get "instantenous" velocity vector of a given obstacle, using stepwise Δposition/Δtime
+# Names should be a
+# TODO: Finish this
+def get_obstacle_velocity(df: pd.DataFrame, marker_names):
+    pass
+
 if __name__ == "__main__":
     df = limits.csv_to_df(limits.file_name, limits.file_dir)
     x_angle, y_angle, z_angle = get_marker_body_angle(df, "FrontMod")
@@ -301,7 +374,7 @@ if __name__ == "__main__":
     flat_times = get_robot_flat_times(df, dist)
     true_angles = get_module_angles(df, get_empirical_angle_offsets(df, flat_times))
 
-    ax = plot_angles(df, true_angles[0][0], true_angles[0][1], true_angles[0][2]) # frontmod
+    ax = plot_angles(df, true_angles[0][1], true_angles[1][1], true_angles[0][1]) # frontmod
     # ax = plot_angles(df, true_angles[1][0], true_angles[1][1], true_angles[1][2]) # backmod
     # ax = plot_marker_distance(df, dist)
     plot_robot_flat_times(flat_times, ax)

@@ -4,7 +4,7 @@ import numpy as np
 from datetime import datetime
 
 # this is where we specify what trial we want to analyze
-wire_diam = 0.5
+wire_diam = 0.5 
 pvc_spacing = 30
 phi_fb = 0.7
 
