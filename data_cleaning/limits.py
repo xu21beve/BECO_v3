@@ -4,12 +4,65 @@ import numpy as np
 from datetime import datetime
 
 # this is where we specify what trial we want to analyze
-wire_diam = 0.5 
-pvc_spacing = 30
-phi_fb = 0.7
+wire_diam = 1.0
+pvc_spacing = 20
+phi_fb = 0.2
 
 file_dir = f'processed_data/{wire_diam}mm_Wire_Spring/'
 file_name = f'{pvc_spacing}mm_{phi_fb}.csv'
+
+front_marker2_is_top_cases = [
+    [1.0, 30, 0.45], [1.0, 30, 0.86],
+    [1.0, 20, 0.2], [1.0, 20, 0.28],
+    [0.8, 20, 0.9], [0.8, 20, 0.1], [0.8, 20, 0.35],
+    [0.5, 20, 0.28], [0.5, 20, 0.27], [0.5, 20, 0.12]
+]
+back_marker2_is_top_cases = [
+    ["static", 30, "all"]
+]
+
+
+def get_module_names(df: pd.DataFrame):
+    front_module_candidates = ["FrontMod", "FrontBody"]
+    back_module_candidates = ["BackMod", "BackMod2", "BackBody"]
+
+    front_mod_name = next((name for name in front_module_candidates if (name, "Position", "X") in df.columns), None)
+    back_mod_name = next((name for name in back_module_candidates if (name, "Position", "X") in df.columns), None)
+    return front_mod_name, back_mod_name
+
+
+def get_top_marker_names(df: pd.DataFrame):
+    front_mod_name, back_mod_name = get_module_names(df)
+    settings = [wire_diam, pvc_spacing, phi_fb]
+
+    front_marker_name = "Marker2" if settings in front_marker2_is_top_cases else "Marker1"
+    back_marker_name = "Marker2" if settings in back_marker2_is_top_cases else "Marker1"
+
+    return f"{front_mod_name}:{front_marker_name}", f"{back_mod_name}:{back_marker_name}"
+
+
+# Helper: get a single position component (X, Y, or Z) for a marker, handling the .1 subscript
+def get_marker_pos(df: pd.DataFrame, marker_name: str, component: str):
+    """
+    Returns a pandas Series of the specified position component for a marker.
+    Automatically appends '.1' to the component if the base column doesn't exist.
+    """
+    if (marker_name, "Position", component) in df.columns:
+        return df[(marker_name, "Position", component)]
+    else:
+        return df[(marker_name, "Position", component + ".1")]
+
+
+# Helper: get all three position components (X, Y, Z) for a marker as an (n_samples, 3) numpy array
+def get_marker_pos_xyz(df: pd.DataFrame, marker_name: str):
+    """
+    Returns an (n_samples, 3) numpy array of [X, Y, Z] positions for a marker.
+    """
+    x = get_marker_pos(df, marker_name, "X").to_numpy()
+    y = get_marker_pos(df, marker_name, "Y").to_numpy()
+    z = get_marker_pos(df, marker_name, "Z").to_numpy()
+    return np.column_stack((x, y, z))
+
 
 def csv_to_df(filename, file_dir):
     df = pd.read_csv(file_dir + filename, header=[0,1,2], index_col=0)
@@ -22,7 +75,8 @@ def csv_to_df(filename, file_dir):
 # Plot vertical lines at the start and stop times
 def plot_start_stop(df: pd.DataFrame):
     t = df.index
-    z = df['FrontMod:Marker1', 'Position', 'Z.1']
+    front_mod_name, _ = get_module_names(df)
+    z = get_marker_pos(df, f"{front_mod_name}:Marker1", "Z")
     start_t, stop_t = time_limits(df)
 
     fig, ax = plt.subplots()
@@ -40,7 +94,8 @@ def plot_start_stop(df: pd.DataFrame):
 # Plot vertical lines at the pickup and setdown times
 def plot_intervention(df: pd.DataFrame, start_t: float, stop_t: float, pickup_true_perimeter_false: bool, ax1=None):
     t = df.index
-    y = df[("FrontMod", "Position", "Y")]
+    front_mod_name, _ = get_module_names(df)
+    y = get_marker_pos(df, front_mod_name, "Y")
     
     events = sense_robot_pickup(df, start_t, stop_t) if pickup_true_perimeter_false else sense_robot_perimeter(df, start_t, stop_t)
 
@@ -85,10 +140,11 @@ def show_plot(timestamp_label=False):
 # but on the same scale, and also plot horizontal and vertical lines of the perimeter as defined 
 # by the PVC. 
 def plot_mod_path(df: pd.DataFrame):
-    x_f = df['FrontMod', 'Position', 'X']
-    z_f = df['FrontMod', 'Position', 'Z']
-    x_b = df['BackMod2', 'Position', 'X']
-    z_b = df['BackMod2', 'Position', 'Z']
+    front_mod_name, back_mod_name = get_module_names(df)
+    x_f = get_marker_pos(df, front_mod_name, "X")
+    z_f = get_marker_pos(df, front_mod_name, "Z")
+    x_b = get_marker_pos(df, back_mod_name, "X")
+    z_b = get_marker_pos(df, back_mod_name, "Z")
     start_t, stop_t = time_limits(df)
 
     fig, ax = plt.subplots()
@@ -97,8 +153,8 @@ def plot_mod_path(df: pd.DataFrame):
 
     # Find PVC perimeter
     # Find the first time when pvc1 and pvc4 have non-empty position values
-    pvc1_x = df[("pvc1", "Position", "X")]
-    pvc4_x = df[("pvc4", "Position", "X")]
+    pvc1_x = get_marker_pos(df, "pvc1", "X")
+    pvc4_x = get_marker_pos(df, "pvc4", "X")
 
     # First index where both pvc1 and pvc4 have non-NaN position values
     valid_mask = pvc1_x.notna() & pvc4_x.notna()
@@ -158,8 +214,8 @@ def sense_robot_perimeter(df: pd.DataFrame, start_t: float, stop_t: float):
         return None
 
     # Find the first time when pvc1 and pvc4 have non-empty position values
-    pvc1_x = df[("pvc1", "Position", "X")]
-    pvc4_x = df[("pvc4", "Position", "X")]
+    pvc1_x = get_marker_pos(df, "pvc1", "X")
+    pvc4_x = get_marker_pos(df, "pvc4", "X")
 
     # First index where both pvc1 and pvc4 have non-NaN position values
     valid_mask = pvc1_x.notna() & pvc4_x.notna()
@@ -202,18 +258,17 @@ def sense_robot_perimeter(df: pd.DataFrame, start_t: float, stop_t: float):
     window_mask = (df.index >= start_t) & (df.index <= stop_t)
 
     # Determine which back module column name is present
-    back_mod_col = "BackMod" if ("BackMod", "Position", "X") in df.columns else \
-                   "BackMod2" if ("BackMod2", "Position", "X") in df.columns else None
+    front_mod_name, back_mod_name = get_module_names(df)
 
-    # Check if FrontMod and BackMod go outside the perimeter
-    front_x = df.loc[window_mask, ("FrontMod", "Position", "X")]
-    front_z = df.loc[window_mask, ("FrontMod", "Position", "Z")]
+    # Check if the modules go outside the perimeter
+    front_x = df.loc[window_mask, (front_mod_name, "Position", "X")]
+    front_z = df.loc[window_mask, (front_mod_name, "Position", "Z")]
 
     front_outside = (front_x < x_min) | (front_x > x_max) | (front_z < z_min) | (front_z > z_max)
 
-    if back_mod_col is not None:
-        back_x = df.loc[window_mask, (back_mod_col, "Position", "X")]
-        back_z = df.loc[window_mask, (back_mod_col, "Position", "Z")]
+    if back_mod_name is not None:
+        back_x = df.loc[window_mask, (back_mod_name, "Position", "X")]
+        back_z = df.loc[window_mask, (back_mod_name, "Position", "Z")]
         back_outside = (back_x < x_min) | (back_x > x_max) | (back_z < z_min) | (back_z > z_max)
     else:
         back_outside = pd.Series(False, index=front_outside.index)
@@ -250,7 +305,8 @@ def sense_robot_pickup(df: pd.DataFrame, start_t: float, stop_t: float):
     y_lim = 0.14
 
     # go through entire file, at first, try observing only one marker's z-axis (which is the interesting direction motion for mocap)
-    y = df[("FrontMod", "Position", "Y")]
+    front_mod_name, _ = get_module_names(df)
+    y = get_marker_pos(df, front_mod_name, "Y")
 
     # Restrict to the time window [start_t, stop_t]
     y_windowed = y.loc[start_t:stop_t]
@@ -309,7 +365,7 @@ def time_limits(df: pd.DataFrame):
 
     # go through entire file, at first, try observing only one marker's z-axis (which is the interesting direction motion for mocap)
     x = df.index.to_series()
-    y = df[("FrontMod:Marker1", "Position", "Z.1")]
+    y = get_marker_pos(df, "FrontMod:Marker1", "Z")
     slope_vectorized = y.diff() / x.diff()
 
     mask = slope_vectorized.to_numpy() > limit_slope          # boolean array, NaN -> False
