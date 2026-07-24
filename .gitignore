@@ -3,5 +3,10 @@
 .vscode/c_cpp_properties.json
 .vscode/launch.json
 .vscode/ipch
+.vscode/settings.json
 python/__pycache__/
 python/.venv
+*.csv
+*.pyc
+*.fig
+*.mp4

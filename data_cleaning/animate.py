@@ -401,9 +401,10 @@ def animate_combined(df: pd.DataFrame, top_marker_bottom_points, module_normals,
     from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
     # --- Data preparation ---
-    top_marker_front, top_marker_back, front_bottom, back_bottom = top_marker_bottom_points
+    front_bottom, back_bottom, top_marker_front, top_marker_back, = top_marker_bottom_points
     front_normals, back_normals = module_normals
     marker_pos_list = recon.get_all_robot_markers_pos(df)
+    robot_com_pos = recon.get_com_points(df, front_bottom, back_bottom)
 
     # Ensure corrected normals point upward
     front_n = front_normals.copy()
@@ -451,7 +452,7 @@ def animate_combined(df: pd.DataFrame, top_marker_bottom_points, module_normals,
     fig = plt.figure(figsize=(10, 8))
     ax = fig.add_subplot(111, projection='3d')
 
-    plot_pts = [front_bottom, back_bottom] + marker_pos_list
+    plot_pts = [front_bottom, back_bottom] + marker_pos_list + robot_com_pos
     if has_raw:
         plot_pts += [raw_front_bottom, raw_back_bottom]
     all_pts = np.vstack(plot_pts)
@@ -488,6 +489,7 @@ def animate_combined(df: pd.DataFrame, top_marker_bottom_points, module_normals,
     # --- Corrected bottom points ---
     front_pt, = ax.plot([], [], [], 'bo', markersize=4)
     back_pt,  = ax.plot([], [], [], 'o', color='orange', markersize=4)
+    robot_com_pt, = ax.plot([], [], [], 'o', color='black', markersize=5, label='COM')
 
     # --- Raw bottom points ---
     if has_raw:
@@ -523,6 +525,7 @@ def animate_combined(df: pd.DataFrame, top_marker_bottom_points, module_normals,
             back_raw_patch.set_verts([np.zeros((4, 3))])
         front_pt.set_data([], []); front_pt.set_3d_properties([])
         back_pt.set_data([], []);  back_pt.set_3d_properties([])
+        robot_com_pt.set_data([], []); robot_com_pt.set_3d_properties([])
         if has_raw:
             front_raw_pt.set_data([], []); front_raw_pt.set_3d_properties([])
             back_raw_pt.set_data([], []);  back_raw_pt.set_3d_properties([])
@@ -532,7 +535,7 @@ def animate_combined(df: pd.DataFrame, top_marker_bottom_points, module_normals,
             front_normal_vec.set_segments([])
         if back_normal_vec is not None:
             back_normal_vec.set_segments([])
-        ret = [front_patch, back_patch, front_pt, back_pt,
+        ret = [front_patch, back_patch, front_pt, back_pt, robot_com_pt,
                front_normal_vec, back_normal_vec, *marker_lines]
         if has_raw:
             ret += [front_raw_patch, back_raw_patch, front_raw_pt, back_raw_pt]
@@ -559,6 +562,10 @@ def animate_combined(df: pd.DataFrame, top_marker_bottom_points, module_normals,
         bg = to_graph(back_bottom[frame:frame+1])
         front_pt.set_data(fg[0], fg[1]); front_pt.set_3d_properties(fg[2])
         back_pt.set_data(bg[0], bg[1]);  back_pt.set_3d_properties(bg[2])
+
+        com_gp = to_graph(robot_com_pos[0][frame:frame+1])
+        robot_com_pt.set_data(com_gp[0], com_gp[1])
+        robot_com_pt.set_3d_properties(com_gp[2])
 
         # Normals
         front_normal = front_n[frame]
@@ -588,7 +595,7 @@ def animate_combined(df: pd.DataFrame, top_marker_bottom_points, module_normals,
             ln.set_3d_properties(gp[2])
 
         ax.set_title(f'Robot Animation — t = {df.index[frame]:.3f}s')
-        return (front_patch, back_patch, front_pt, back_pt,
+        return (front_patch, back_patch, front_pt, back_pt, robot_com_pt,
                 front_normal_vec, back_normal_vec, *marker_lines)
 
     base_interval = 50
@@ -616,7 +623,7 @@ if __name__ == "__main__":
     raw_front_normals = recon.get_marker_body_normal(df, front_mod_name)
     raw_back_normals  = recon.get_marker_body_normal(df, back_mod_name)
     raw_module_normals = (raw_front_normals, raw_back_normals)
-    # raw_bottom_pts = recon.get_top_marker_bottom_points(df, raw_module_normals)
+    raw_bottom_pts = recon.get_top_marker_bottom_points(df, raw_module_normals)
 
     # Choose which animation to run:
     # Option 1: Robot Planes only

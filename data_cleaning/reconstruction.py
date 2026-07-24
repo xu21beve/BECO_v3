@@ -17,10 +17,10 @@ mod_vectors_static = {
     "back":  [[1e-2*(-3.9/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(1.0+2.6)],
               [1e-2*(-1)*(-3.9/2+3.675), 1e-2*(-1.05-2.7-2.5/2), 1e-2*(1.0+2.6)]]}
 top_marker_lengths = { # sorted as [front, back]
-    "0.5": [3.5 + (2.54*1.5), 3.65 + (2.54*1.5)],
-    "0.8": [3.5 + (2.54*1.5), 3.65 + (2.54*1.5)],
-    "1.0": [3.5 + (2.54*1.5), 3.65 + (2.54*1.5)],
-    "static": [1.05 + (2.54*1.5), 1.05 + (2.54*1.5)]
+    "0.5": [1e-2*(3.5 + (2.54*1.5)), 1e-2*(3.65 + (2.54*1.5))],
+    "0.8": [1e-2*(3.5 + (2.54*1.5)), 1e-2*(3.65 + (2.54*1.5))],
+    "1.0": [1e-2*(3.5 + (2.54*1.5)), 1e-2*(3.65 + (2.54*1.5))],
+    "static": [1e-2*(1.05 + (2.54*1.5)), 1e-2*(1.05 + (2.54*1.5))]
 }
 top_marker_z_distance = { # sorted as [front, back]
     "0.5": [(38.1-1.0)+2.6, 25.4+2.6+(38.1-1.0)],
@@ -102,7 +102,7 @@ def plot_angles(df: pd.DataFrame, front_normals, back_normals):
     fx, fy, fz = _normals_to_angles(front_normals)
     bx, by, bz = _normals_to_angles(back_normals)
 
-    fig, ax = plt.subplots()
+    ax = plt.subplot()
     ax.plot(t, fx, color="blue", label='Front x')
     ax.plot(t, fy, color="orange", label='Front y')
     ax.plot(t, fz, color="green", label='Front z')
@@ -325,7 +325,6 @@ def get_module_normals(df: pd.DataFrame, normal_offsets):
 # ---------------------------------------------------------------------------
 
 # Get top marker bottom points using normal vectors directly
-# FIXME: Weird, because it doesn't work for the raw angles. Commented out offsets for now
 def get_top_marker_bottom_points(df: pd.DataFrame, module_normals):
     front_normals, back_normals = module_normals
     top_marker_1, top_marker_2 = get_top_marker_names(df)
@@ -376,6 +375,14 @@ def get_all_robot_markers_pos(df: pd.DataFrame):
 
     return marker_pos  # list of 6 arrays: front M1, M2, M3, back M1, M2, M3
 
+# Get com point of the robot, estimated using the mean point between its two module bottom points
+def get_com_points(df: pd.DataFrame, front_bottom_point, back_bottom_point):
+    # Use get_top_marker_bottom_body_points
+    front_bottom_point = np.asarray(front_bottom_point, dtype=float)
+    back_bottom_point = np.asarray(back_bottom_point, dtype=float)
+    return np.mean(np.stack([front_bottom_point, back_bottom_point], axis=0), axis=0)
+
+# Get pvc marker points for a single pvc
 def get_pvc_marker_points(df: pd.DataFrame, pvc_name, marker_names=["Marker1", "Marker2", "Marker3"]):
     points = []
 
@@ -396,19 +403,112 @@ def get_all_pvc_marker_points(df: pd.DataFrame):
     
     return points
 
-def get_pvc_velocity(df: pd.DataFrame, pvc_name):
-    vel_vectors = []
-    for name in pvc_name:
-        t = df.index.to_series()
-        # pose = limits.get_marker_pos_xyz(df, name)
-
-        x_dot = limits.get_marker_pos(df, name ,'X').diff() / t.diff() # By only using the pvc_name, we are getting the rigid body's info
-        y_dot = limits.get_marker_pos(df, name ,'Y').diff() / t.diff()
-        z_dot = limits.get_marker_pos(df, name ,'Z').diff() / t.diff()
-
-        vel_vectors.append([x_dot, y_dot, z_dot])
+# Function that returns all pvc rigid body z displacements (from initial z at timestamp 0) over time. 
+# This means the marker names will just be "pvc1", "pvc2", and so on.
+def get_pvc_z_displacements(df: pd.DataFrame, pvc_names=None):
+    """
+    Get Z displacements for all PVC rigid bodies from their initial positions.
     
+    Parameters:
+        df: DataFrame with time index
+        pvc_names: list of PVC names (default: ["pvc1", "pvc2", "pvc3", "pvc4"])
+    
+    Returns:
+        pvc_z_displacements: (n_samples, 4) array of Z displacements for each PVC
+        initial_z: (4,) array of initial Z positions for each PVC
+    """
+    if pvc_names is None:
+        pvc_names = ["pvc1", "pvc2", "pvc3", "pvc4"]
+    
+    # Get Z positions for each PVC rigid body
+    pvc_z = np.column_stack(
+        [limits.get_marker_pos(df, name, "Z").to_numpy() for name in pvc_names]
+    )
+    
+    # Get initial Z positions (at timestamp 0)
+    initial_z = pvc_z[0, :]
+    
+    # Compute displacements from initial positions
+    pvc_z_displacements = pvc_z - initial_z
+    
+    return pvc_z_displacements, initial_z
+
+def get_marker_velocity(df: pd.DataFrame, marker_names=None, marker_pos=None):
+    vel_vectors = []
+
+    if marker_names is not None:
+        for name in marker_names:
+            t = df.index.to_series()
+            # pose = limits.get_marker_pos_xyz(df, name)
+        
+            x_dot = limits.get_marker_pos(df, name ,'X').diff() / t.diff()
+            y_dot = limits.get_marker_pos(df, name ,'Y').diff() / t.diff()
+            z_dot = limits.get_marker_pos(df, name ,'Z').diff() / t.diff()
+        
+            vel_vectors.append([x_dot, y_dot, z_dot])
+    elif marker_pos is not None:
+        for pos in marker_pos:
+            pos_df = pd.DataFrame(pos)
+
+            t = df.index.to_series()
+                
+            # diff() reduces size by 1, so pad the first timestamp with NaN to keep length
+            x_dot = np.diff(pos_df.iloc[:, 0].to_numpy()) / np.diff(t.to_numpy())
+            y_dot = np.diff(pos_df.iloc[:, 1].to_numpy()) / np.diff(t.to_numpy())
+            z_dot = np.diff(pos_df.iloc[:, 2].to_numpy()) / np.diff(t.to_numpy())
+
+            x_dot = np.insert(x_dot, 0, np.nan)
+            y_dot = np.insert(y_dot, 0, np.nan)
+            z_dot = np.insert(z_dot, 0, np.nan)
+
+            vel_vectors.append(np.column_stack((x_dot, y_dot, z_dot)))
+    else:
+        print("Cannot specify neither marker_name or marker_pos")
+
     return vel_vectors
+
+def get_smoothed_marker_velocity(df: pd.DataFrame, window_size=3, marker_names=None, marker_pos=None):
+    """Get smoothed marker velocities by averaging over a rolling window.
+
+    Parameters:
+        df: DataFrame with a time index.
+        window_size: number of samples to average over.
+        marker_names: list of marker names to compute velocities for.
+        marker_pos: list of numpy arrays of marker positions to compute velocities for.
+
+    Returns:
+        If marker_names is provided, returns a list of [x_dot, y_dot, z_dot] pandas Series.
+        If marker_pos is provided, returns a list of numpy arrays of shape (n_samples, 3).
+    """
+    if window_size < 1:
+        raise ValueError("window_size must be at least 1")
+
+    vel_vectors = get_marker_velocity(df, marker_names=marker_names, marker_pos=marker_pos)
+
+    if marker_names is not None:
+        smoothed = []
+        for x_dot, y_dot, z_dot in vel_vectors:
+            smoothed.append([
+                x_dot.rolling(window=window_size, min_periods=1, center=True).mean(),
+                y_dot.rolling(window=window_size, min_periods=1, center=True).mean(),
+                z_dot.rolling(window=window_size, min_periods=1, center=True).mean(),
+            ])
+        return smoothed
+
+    if marker_pos is not None:
+        smoothed = []
+        kernel = np.ones(window_size, dtype=float) / float(window_size)
+        for vel in vel_vectors:
+            x_smooth = np.convolve(vel[:, 0], kernel, mode='same')
+            y_smooth = np.convolve(vel[:, 1], kernel, mode='same')
+            z_smooth = np.convolve(vel[:, 2], kernel, mode='same')
+            smoothed.append(np.column_stack((x_smooth, y_smooth, z_smooth)))
+        return smoothed
+
+    raise ValueError("Cannot specify neither marker_names nor marker_pos")
+
+def get_pvc_velocity(df: pd.DataFrame, pvc_name):    
+    return get_marker_velocity(df, pvc_name) # By only using the pvc_name, we are getting the rigid body's info
 
 # Identify active obstacles
 # Could use velocity for spring-loaded tests, but since this doesn't work for static tests,

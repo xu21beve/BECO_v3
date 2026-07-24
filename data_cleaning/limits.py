@@ -4,11 +4,11 @@ import numpy as np
 from datetime import datetime
 
 # this is where we specify what trial we want to analyze
-wire_diam = 1.0
+wire_diam = 0.8
 pvc_spacing = 20
-phi_fb = 0.2
+phi_fb = 0.69
 
-file_dir = f'processed_data/{wire_diam}mm_Wire_Spring/'
+file_dir = f'processed_data/{wire_diam}mm_Wire_Spring/' if wire_diam != 'static' else f'processed_data/Static_Tests/'
 file_name = f'{pvc_spacing}mm_{phi_fb}.csv'
 
 front_marker2_is_top_cases = [
@@ -132,8 +132,8 @@ def plot_intervention(df: pd.DataFrame, start_t: float, stop_t: float, pickup_tr
 # Show the plot
 def show_plot(timestamp_label=False):
     plt.title(f"wire_diam={wire_diam} | pvc_spacing={pvc_spacing} | phi_fb={phi_fb}")
-    plt.savefig(f"limit_figs/wire_diam={wire_diam}-pvc_spacing={pvc_spacing}-phi_fb={phi_fb}.png" 
-                if not timestamp_label else f"limit_figs/wire_diam={wire_diam}-pvc_spacing={pvc_spacing}-phi_fb={phi_fb}-timestamp={datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}.png")
+    plt.savefig(f"stiff_obstacle_figs/wire_diam={wire_diam}-pvc_spacing={pvc_spacing}-phi_fb={phi_fb}.png" 
+                if not timestamp_label else f"stiff_obstacle_figs/wire_diam={wire_diam}-pvc_spacing={pvc_spacing}-phi_fb={phi_fb}-timestamp={datetime.now().strftime("%Y-%m-%d-%H:%M:%S")}.png")
     plt.show()
 
 # Plot the front module's and back module's path (along the x and z axes) as two separate lines 
